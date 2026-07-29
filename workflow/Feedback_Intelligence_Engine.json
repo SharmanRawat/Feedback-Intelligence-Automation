@@ -1,0 +1,907 @@
+{
+  "name": "Feedback Intelligence Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "0",
+          "mode": "id"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1872,
+        480
+      ],
+      "id": "12a401fc-b516-4446-94e5-5800e5a066a5",
+      "name": "Google Sheets Trigger",
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "89vBVmq6aEO9lerN",
+          "name": "Google Sheets Trigger account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "numberOutputs": 2,
+        "output": "={{ $json.valid }}"
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -1424,
+        464
+      ],
+      "id": "f71995e8-75c5-4a27-ac92-50441a247e7c",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_GROQ_API_KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"llama-3.3-70b-versatile\", messages: [{ role: \"system\", content: \"You are a strict JSON-only AI. Analyze the sentiment. If it has only praise, it is Positive. If it has only complaints, it is Negative. If it has both, it is Mixed. If it says 'it was fine' or is vague, it is Neutral. Return ONLY a valid JSON object following this exact schema: { \\\"sentiment\\\": \\\"Positive | Negative | Neutral | Mixed\\\", \\\"category\\\": \\\"Venue | Speaker | Content | Logistics | Technical | Other\\\", \\\"urgency_score\\\": integer (1 to 5), \\\"confidence_score\\\": integer (1 to 10), \\\"action_item\\\": string or null, \\\"coordinator_reply_draft\\\": string }\" }, { role: \"user\", content: \"Feedback: \" + $json[\"Feedback Test\"] + \". Event: \" + $json[\"Event name\"] + \". Student: \" + $json[\"Student Name\"] + \".\" }], response_format: { type: \"json_object\" }, temperature: 0 }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -800,
+        464
+      ],
+      "id": "05f9f9b8-a21d-4321-a2b2-db8eb57fb60f",
+      "name": "HTTP Request",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\nconst emailMap = {\n  \"Venue\": \"sharmanrawat495@gmail.com\",\n  \"Speaker\": \"sharmanrawat495@gmail.com\",\n  \"Logistics\": \"sharmanrawat495@gmail.com\",\n  \"Technical\": \"sharmanrawat495@gmail.com\",\n  \"Content\": \"sharmanrawat495@gmail.com\",\n  \"Other\": \"sharmanrawat495@gmail.com\"\n};\n\nfor (const item of items) {\n  const data = item.json;\n  data.coordinatorEmail = emailMap[data.category] || \"coordinator@college.edu\";\n\n  const sentiment = data.sentiment ? data.sentiment.toLowerCase() : 'neutral';\n  const urgency = data.urgency_score || 1;\n  const confidence = data.confidence_score || 1;\n\n  let finalRoute = 'NeedsReview'; \n\n  if (sentiment === 'positive') {\n    finalRoute = 'Testimonials';\n  } else if (sentiment === 'negative' && urgency >= 4) {\n    finalRoute = 'HighPriorityEmail';\n  } else if (sentiment === 'negative' && urgency <= 3) {\n    finalRoute = 'ActionItemsAndNormalEmail';\n  } else if (sentiment === 'neutral' || sentiment === 'mixed' || confidence < 6) {\n    finalRoute = 'NeedsReview';\n  }\n\n  data.finalRoute = finalRoute;\n  results.push({ json: data });\n}\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        480
+      ],
+      "id": "70ad0f15-3e9a-4de0-a8f5-1842e8d2a033",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.finalRoute }}",
+                    "rightValue": "Testimonials",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "af44c5cc-6f4b-4aba-b9ff-20756084ceed"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Testimonials"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "da373045-946b-48db-a682-98a7145e7cb1",
+                    "leftValue": "={{ $json.finalRoute }}",
+                    "rightValue": "HighPriorityEmail",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "HighPriorityEmail"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "da1a9ba4-47e0-49cb-b477-2f0487e1f055",
+                    "leftValue": "={{ $json.finalRoute }}",
+                    "rightValue": "ActionItemsAndNormalEmail",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ActionItemsAndNormalEmail"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "f0058822-fceb-4871-8ae3-3c23881f7998",
+                    "leftValue": "={{ $json.finalRoute }}",
+                    "rightValue": "NeedsReview",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "NeedsReview"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -192,
+        432
+      ],
+      "id": "03a02467-148f-42a0-8086-360ad3e4f8df",
+      "name": "Switch1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\nfor (const item of items) {\n    const safeClone = { ...item.json };\n    delete safeClone.__savedInput;\n    \n    item.json.__savedInput = safeClone;\n    results.push(item);\n    \n    await new Promise(resolve => setTimeout(resolve, 2000));\n}\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        480
+      ],
+      "id": "23ddc9d7-6ef8-4a66-acc1-9ac60795667f",
+      "name": "Backup Original Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\nfor (const item of items) {\n  const data = item.json;\n  const feedbackText = data[\"Feedback Test\"] || \"\";\n  \n  const isGibberish = !/[a-zA-Z]{3,}/.test(feedbackText);\n  \n  if (!feedbackText || feedbackText.length < 5 || isGibberish) {\n    results.push({ json: { ...data, valid: false } });\n  } else {\n    results.push({ json: { ...data, valid: true } });\n  }\n}\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1664,
+        480
+      ],
+      "id": "fb1ff184-0c51-4d4f-a620-9e481dd79ad7",
+      "name": "Validation"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst backupItems = $('Backup Original Data').all();\nconst results = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const httpResponse = items[i].json;\n  const originalData = backupItems[i] ? backupItems[i].json : {};\n\n  let aiString = httpResponse.choices[0].message.content;\n  aiString = aiString.trim();\n  if (aiString.startsWith('```json')) aiString = aiString.replace(/```json\\n?/, '');\n  if (aiString.endsWith('```')) aiString = aiString.replace(/```$/, '');\n  if (aiString.startsWith('json\\n')) aiString = aiString.replace('json\\n', '');\n  aiString = aiString.trim();\n\n  let parsedAI;\n  let finalData;\n  try {\n    parsedAI = JSON.parse(aiString);\n  } catch (error) {\n    finalData = {\n      error: \"Malformed AI JSON\",\n      rawAiResponse: aiString,\n      route: \"NeedsReview\",\n      ...originalData\n    };\n    results.push({ json: finalData });\n    continue;\n  }\n\n  const requiredKeys = ['sentiment', 'category', 'urgency_score', 'confidence_score', 'action_item', 'coordinator_reply_draft'];\n  const missingKeys = requiredKeys.filter(key => !(key in parsedAI));\n  if (missingKeys.length > 0) {\n    finalData = {\n      error: `Missing keys: ${missingKeys.join(', ')}`,\n      rawAiResponse: aiString,\n      route: \"NeedsReview\",\n      ...originalData\n    };\n    results.push({ json: finalData });\n    continue;\n  }\n\n  parsedAI.urgency_score = Number(parsedAI.urgency_score);\n  parsedAI.confidence_score = Number(parsedAI.confidence_score);\n\n  finalData = {\n    ...originalData, \n    ...parsedAI,\n    route: \"Process\",\n    rawAiResponse: aiString,\n    error: null\n  };\n  results.push({ json: finalData });\n}\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -608,
+        464
+      ],
+      "id": "da1a4ea3-a5ad-4f15-9db7-2dc5ba6c0b87",
+      "name": "Parser"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\nfor (const item of items) {\n    await new Promise(resolve => setTimeout(resolve, 2500));\n    results.push(item);\n}\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -992,
+        480
+      ],
+      "id": "e4f30b6d-0335-42dd-bb85-a93ee063c64c",
+      "name": "Delay"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 962059232,
+          "mode": "list",
+          "cachedResultName": "Testimonials",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=962059232"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Student Name": "={{ $json['Student Name'] }}",
+            "Email": "={{ $json['Email'] }}",
+            "Event Name": "={{ $json['Event name'] }}",
+            "Feedback Test": "={{ $json['Feedback Test'] }}",
+            "Reply Draft": "={{ $json['coordinator_reply_draft'] }}",
+            "Sentiment": "={{ $json['sentiment'] }}",
+            "Category": "={{ $json['category'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Student Name",
+              "displayName": "Student Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Event Name",
+              "displayName": "Event Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Feedback Test",
+              "displayName": "Feedback Test",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Reply Draft",
+              "displayName": "Reply Draft",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Sentiment",
+              "displayName": "Sentiment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Category",
+              "displayName": "Category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        336,
+        144
+      ],
+      "id": "65ee448e-10ad-4ef2-a63a-df40d934ec9b",
+      "name": "Testimonials append",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "s5vKaJNIaucdSNKb",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 352023645,
+          "mode": "list",
+          "cachedResultName": "Needs Review",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=352023645"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Student Name": "={{ $json['Student Name'] }}",
+            "Email": "={{ $json['Email'] }}",
+            "Event Name": "={{ $json['Event name'] }}",
+            "Feedback Test": "={{ $json['Feedback Test'] }}",
+            "Error": "={{ $json['error'] }}",
+            "Raw AI Response": "={{ $json['rawAiResponse'] }}",
+            "Timestamp": "={{ $json['Timestamp'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Student Name",
+              "displayName": "Student Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Event Name",
+              "displayName": "Event Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Feedback Test",
+              "displayName": "Feedback Test",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Error",
+              "displayName": "Error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Raw AI Response",
+              "displayName": "Raw AI Response",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        208,
+        752
+      ],
+      "id": "14f4514f-92e3-46d0-ae89-72c789a13ffe",
+      "name": "Needs Review Append",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "s5vKaJNIaucdSNKb",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1697873757,
+          "mode": "list",
+          "cachedResultName": "Action Items",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=1697873757"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Student Name": "={{$json['Student Name']}}",
+            "Email": "={{$json['Email']}}",
+            "Event Name": "={{$json['Event name']}}",
+            "Feedback Test": "={{$json['Feedback Test']}}",
+            "Category": "={{$json['category']}}",
+            "Action Item": "={{$json['action_item']}}",
+            "Urgency Score": "={{$json['urgency_score']}}",
+            "Reply Draft": "={{$json['coordinator_reply_draft']}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Student Name",
+              "displayName": "Student Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Event Name",
+              "displayName": "Event Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Feedback Test",
+              "displayName": "Feedback Test",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Category",
+              "displayName": "Category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Action Item",
+              "displayName": "Action Item",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Urgency Score",
+              "displayName": "Urgency Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Reply Draft",
+              "displayName": "Reply Draft",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        528
+      ],
+      "id": "0d7509d9-fdf0-4d6e-a424-14be3eee9f2a",
+      "name": "ActionItems Append",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "s5vKaJNIaucdSNKb",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.coordinatorEmail }}",
+        "subject": "=[URGENT] Feedback from {{ $json['Student Name'] }}",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px; border: 1px solid #e0e0e0; padding: 20px; border-radius: 8px; background-color: #ffffff;\">\n  <!-- Urgent Header -->\n  <h2 style=\"color: #d93025; border-bottom: 2px solid #d93025; padding-bottom: 10px;\">⚠️ New Negative Feedback (High Urgency)</h2>\n  \n  <p><strong>Student:</strong> {{ $json['Student Name'] }}</p>\n  <p><strong>Event:</strong> {{ $json['Event name'] }}</p>\n  <p><strong>Feedback:</strong><br><em>{{ $json['Feedback Test'] }}</em></p>\n  \n  <!-- AI Classification Box -->\n  <div style=\"background-color: #f8f9fa; padding: 10px; border-left: 4px solid #1a73e8; margin: 15px 0;\">\n    <p><strong>Category:</strong> {{ $json['category'] }}</p>\n    <p><strong>Urgency Score:</strong> {{ $json['urgency_score'] }}/5</p>\n  </div>\n\n  <!-- THE ACTION PLAN (Copy this section!) -->\n  <div style=\"background-color: #eef7ff; padding: 15px; border: 1px dashed #1a73e8; border-radius: 6px; margin: 15px 0;\">\n    <p style=\"margin: 0 0 10px 0; font-weight: bold; font-size: 16px;\">📋 Immediate Action Plan:</p>\n    <p style=\"margin: 0; white-space: pre-wrap;\">{{ $json['action_item'] }}</p>\n  </div>\n  \n  <!-- THE DRAFT REPLY (Copy this section!) -->\n  <div style=\"background-color: #f3f4f6; padding: 15px; border-left: 4px solid #4CAF50; margin-top: 15px;\">\n    <p style=\"margin: 0 0 10px 0; font-weight: bold; font-size: 16px;\">📝 Drafted Reply for the Student (Copy & Paste this):</p>\n    <div style=\"background: #ffffff; padding: 12px; border-radius: 4px; border: 1px solid #ddd;\">\n      <p style=\"margin: 0; white-space: pre-wrap; font-style: italic;\">{{ $json['coordinator_reply_draft'] }}</p>\n    </div>\n  </div>\n</div>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        752,
+        448
+      ],
+      "id": "f1f126d7-60bb-4e05-986b-96ff95b062cf",
+      "name": "Urgent Coordinator Email (High Priority)",
+      "webhookId": "160bfae6-6d65-4083-887c-09834ab21bb8",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "651RrteKcT3lYM8L",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{$json.Email}}",
+        "subject": "=Thank you for your amazing feedback, {{ $json['Student Name'] }}!",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; background-color: #ffffff;\">   <div style=\"background-color: #4CAF50; height: 5px; border-radius: 8px 8px 0 0; margin: -20px -20px 15px -20px;\"></div>      <div style=\"padding-top: 10px;\">     <h2 style=\"color: #333333; margin-top: 0; margin-bottom: 20px;\">🌟 We're thrilled you loved it!</h2>          <p>Hi <strong>{{ $json['Student Name'] }}</strong>,</p>          <p>Thank you so much for your wonderful feedback about the <strong>{{ $json['Event Name'] }}</strong>. We are absolutely delighted to hear that you enjoyed the experience!</p>          <div style=\"background-color: #f8f9fa; padding: 15px; border-left: 4px solid #4CAF50; margin: 20px 0; border-radius: 0 4px 4px 0;\">       <p style=\"margin: 0; color: #555555; font-style: italic;\">Your kind words mean the world to our team and the speakers. We hope to see you again at our future events!</p>     </div>          <p style=\"margin-top: 15px;\">Stay tuned for our upcoming announcements!</p>          <p>Best regards,<br>The Events Team</p>   </div> </div>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        752,
+        48
+      ],
+      "id": "956ab27e-8a6d-4b50-85f5-b188c04cd86a",
+      "name": "Testimonials replyback (for students)",
+      "webhookId": "3ffb289a-c1ec-43b6-a987-5731e2ffbed6",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "651RrteKcT3lYM8L",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.Email}}",
+        "subject": "=We've received your feedback, {{ $json['Student Name'] }}!",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; background-color: #ffffff;\">\n  <div style=\"background-color: #4CAF50; height: 5px; border-radius: 8px 8px 0 0; margin: -20px -20px 15px -20px;\"></div>\n  \n  <div style=\"padding-top: 10px;\">\n    <h2 style=\"color: #333333; margin-top: 0; margin-bottom: 20px;\">✅ We've received your feedback!</h2>\n    \n    <p>Hi <strong>{{ $json['Student Name'] }}</strong>,</p>\n    \n    <p>Thank you so much for taking the time to share your valuable feedback regarding <strong>{{ $json['Event name'] }}</strong>. We truly appreciate you being a part of our community!</p>\n    \n    <div style=\"background-color: #f8f9fa; padding: 15px; border-left: 4px solid #4CAF50; margin: 20px 0; border-radius: 0 4px 4px 0;\">\n      <p style=\"margin: 0; color: #555555; font-style: italic;\">We take all feedback seriously, and our team is currently reviewing your comments to ensure we can improve future events for everyone.</p>\n    </div>\n    \n    <p style=\"margin-top: 15px;\">We hope to see you at our next event!</p>\n    \n    <p>Best regards,<br>The Events Team</p>\n  </div>\n</div>",
+        "options": {
+          "replyTo": "={{ $json.Email }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        752,
+        240
+      ],
+      "id": "1f1bf061-118a-4ed5-be09-dcbaed48897b",
+      "name": "highpriority autoreply (for students)",
+      "webhookId": "19cdb735-c29d-4355-acfa-32cabebbb195",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "651RrteKcT3lYM8L",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.coordinatorEmail }}",
+        "subject": "=Feedback from {{ $json[\"Student Name\"] }}",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px; border: 1px solid #e0e0e0; padding: 20px; border-radius: 8px; background-color: #ffffff;\">\n  <!-- Urgent Header -->\n  <h2 style=\"color: #d93025; border-bottom: 2px solid #d93025; padding-bottom: 10px;\">⚠️ New Negative Feedback (High Urgency)</h2>\n  \n  <p><strong>Student:</strong> {{ $json['Student Name'] }}</p>\n  <p><strong>Event:</strong> {{ $json['Event name'] }}</p>\n  <p><strong>Feedback:</strong><br><em>{{ $json['Feedback Test'] }}</em></p>\n  \n  <!-- AI Classification Box -->\n  <div style=\"background-color: #f8f9fa; padding: 10px; border-left: 4px solid #1a73e8; margin: 15px 0;\">\n    <p><strong>Category:</strong> {{ $json['category'] }}</p>\n    <p><strong>Urgency Score:</strong> {{ $json['urgency_score'] }}/5</p>\n  </div>\n\n  <!-- THE ACTION PLAN (Copy this section!) -->\n  <div style=\"background-color: #eef7ff; padding: 15px; border: 1px dashed #1a73e8; border-radius: 6px; margin: 15px 0;\">\n    <p style=\"margin: 0 0 10px 0; font-weight: bold; font-size: 16px;\">📋 Immediate Action Plan:</p>\n    <p style=\"margin: 0; white-space: pre-wrap;\">{{ $json['action_item'] }}</p>\n  </div>\n  \n  <!-- THE DRAFT REPLY (Copy this section!) -->\n  <div style=\"background-color: #f3f4f6; padding: 15px; border-left: 4px solid #4CAF50; margin-top: 15px;\">\n    <p style=\"margin: 0 0 10px 0; font-weight: bold; font-size: 16px;\">📝 Drafted Reply for the Student (Copy & Paste this):</p>\n    <div style=\"background: #ffffff; padding: 12px; border-radius: 4px; border: 1px solid #ddd;\">\n      <p style=\"margin: 0; white-space: pre-wrap; font-style: italic;\">{{ $json['coordinator_reply_draft'] }}</p>\n    </div>\n  </div>\n</div>",
+        "options": {
+          "replyTo": "={{ $json.Email }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        192,
+        528
+      ],
+      "id": "b401505f-6e29-4ac5-891e-283f606cbc65",
+      "name": "Action Items reply (for Students)",
+      "webhookId": "708c70c6-2046-4dc3-97e7-351c794387b3",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "651RrteKcT3lYM8L",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Backup Original Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Switch1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch1": {
+      "main": [
+        [
+          {
+            "node": "Testimonials append",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Urgent Coordinator Email (High Priority)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "highpriority autoreply (for students)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action Items reply (for Students)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Needs Review Append",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backup Original Data": {
+      "main": [
+        [
+          {
+            "node": "Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delay": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ActionItems Append": {
+      "main": [
+        [
+          {
+            "node": "Urgent Coordinator Email (High Priority)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Testimonials append": {
+      "main": [
+        [
+          {
+            "node": "Testimonials replyback (for students)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Urgent Coordinator Email (High Priority)": {
+      "main": [
+        []
+      ]
+    },
+    "highpriority autoreply (for students)": {
+      "main": [
+        []
+      ]
+    },
+    "Action Items reply (for Students)": {
+      "main": [
+        [
+          {
+            "node": "ActionItems Append",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "c65990a5-8a04-494c-b598-553944547f60",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6d88673769dddcd8f3c7270e54f91c4038a0e8c1192e803bc2f30d86aacb6939"
+  },
+  "nodeGroups": [],
+  "id": "9c2caJNsFoUfVuS8",
+  "tags": []
+}
