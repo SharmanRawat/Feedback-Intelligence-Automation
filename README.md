@@ -10,7 +10,7 @@ An AI-powered n8n workflow that automatically triages event feedback, classifies
 
 | **Automation Canvas** | **Email Output Example** |
 | :---: | :---: |
-| ![Workflow Canvas](assets/Screenshot_From_2026-07-23_02-23-31.png) | ![Action Plan Email](assets/Screenshot_From_2026-07-23_02-33-45.png) |
+| ![Workflow Canvas](https://github.com/SharmanRawat/Feedback-Intelligence-Automation/blob/main/assets/Screenshot%20From%202026-07-23%2002-23-31.png?raw=true) | ![Action Plan Email](https://github.com/SharmanRawat/Feedback-Intelligence-Automation/blob/main/assets/Screenshot%20From%202026-07-23%2002-33-45.png?raw=true) |
 
 ## 🚀 Key Features
 - **Instant AI Sentiment Analysis:** Classifies feedback into Positive, Negative, Neutral, or Mixed using Groq's Llama 3.3.
